@@ -31,25 +31,26 @@ import inkex
 import simplepath
 import simplestyle
 import simpletransform
-import cubicsuperpath
 import cspsubdiv
-import bezmisc
 import re
+from lxml import etree
+from inkex import paths
+from inkex import bezier
 
 DEFAULT_WIDTH = 100
 DEFAULT_HEIGHT = 100
 
-objStyle = simplestyle.formatStyle(
+objStyle = str(inkex.Style(
     {'stroke': '#000000',
     'stroke-width': 0.1,
     'fill': 'none'
-    })
+    }))
 
-objStyleStart = simplestyle.formatStyle(
+objStyleStart = str(inkex.Style(
     {'stroke': '#FF0000',
     'stroke-width': 0.1,
     'fill': 'none'
-    })
+    }))
 
 
 class inkcape_draw_cartesian:
@@ -73,11 +74,11 @@ class inkcape_draw_cartesian:
     
     def GenPath(self):
         line_attribs = {'style': objStyle, 'd': self.Path}
-        inkex.etree.SubElement(self.group, inkex.addNS('path', 'svg'), line_attribs)
+        etree.SubElement(self.group, inkex.addNS('path', 'svg'), line_attribs)
 
     def GenPathStart(self):
         line_attribs = {'style': objStyleStart, 'd': self.Path}
-        inkex.etree.SubElement(self.group, inkex.addNS('path', 'svg'), line_attribs)
+        etree.SubElement(self.group, inkex.addNS('path', 'svg'), line_attribs)
 
 
 class Line:
@@ -274,12 +275,12 @@ def subdivideCubicPath( sp, flat, i=1 ):
 
             b = ( p0, p1, p2, p3 )
 
-            if cspsubdiv.maxdist( b ) > flat:
+            if bezier.maxdist( b ) > flat:
                 break
 
             i += 1
 
-        one, two = bezmisc.beziersplitatt( b, 0.5 )
+        one, two = bezier.beziersplitatt( b, 0.5 )
         sp[i - 1][2] = one[1]
         sp[i][0] = two[2]
         p = [one[2], one[3], two[1]]
@@ -310,28 +311,28 @@ class Path2Flex( inkex.Effect ):
         inkex.Effect.__init__(self)
         self.knownUnits = ['in', 'pt', 'px', 'mm', 'cm', 'm', 'km', 'pc', 'yd', 'ft']
 
-        self.OptionParser.add_option('--unit', action = 'store',
-          type = 'string', dest = 'unit', default = 'mm',
+        self.arg_parser.add_argument('--unit', action = 'store',
+          type = str, dest = 'unit', default = 'mm',
           help = 'Unit, should be one of ')
 
-        self.OptionParser.add_option('--thickness', action = 'store',
-          type = 'float', dest = 'thickness', default = '3.0',
+        self.arg_parser.add_argument('--thickness', action = 'store',
+          type = float, dest = 'thickness', default = '3.0',
           help = 'Material thickness')
 
-        self.OptionParser.add_option('--zc', action = 'store',
-          type = 'float', dest = 'zc', default = '50.0',
+        self.arg_parser.add_argument('--zc', action = 'store',
+          type = float, dest = 'zc', default = '50.0',
           help = 'Flex height')
 
-        self.OptionParser.add_option('--notch_interval', action = 'store',
-          type = 'int', dest = 'notch_interval', default = '2',
+        self.arg_parser.add_argument('--notch_interval', action = 'store',
+          type = int, dest = 'notch_interval', default = '2',
           help = 'Interval between notches')
 
-        self.OptionParser.add_option('--max_size_flex', action = 'store',
-          type = 'float', dest = 'max_size_flex', default = '1000.0',
+        self.arg_parser.add_argument('--max_size_flex', action = 'store',
+          type = float, dest = 'max_size_flex', default = '1000.0',
           help = 'Max size of a single band of flex, above this limit it will be cut')
 
-        self.OptionParser.add_option('--Mode_Debug', action = 'store',
-          type = 'inkbool', dest = 'Mode_Debug', default = 'false',
+        self.arg_parser.add_argument('--Mode_Debug', action = 'store',
+          type = inkex.Boolean, dest = 'Mode_Debug', default = 'false',
           help = 'Output Debug information in file')
 
         # Dictionary of paths we will construct.  It's keyed by the SVG node
@@ -354,15 +355,8 @@ class Path2Flex( inkex.Effect ):
         self.cx = float( DEFAULT_WIDTH ) / 2.0
         self.cy = float( DEFAULT_HEIGHT ) / 2.0
 
-
-    try:
-        inkex.Effect.unittouu   # unitouu has moved since Inkscape 0.91
-    except AttributeError:
-        try:
-            def unittouu(self, unit):
-                return inkex.unittouu(unit)
-        except AttributeError:
-            pass
+        def unittouu(self, unit):
+            return inkex.unittouu(unit)
 
     def DebugMsg(self, s):
         if self.fDebug:
@@ -491,7 +485,7 @@ class Path2Flex( inkex.Effect ):
 
 
     def GenFlex(self, parent, num_notch, size_notch, xOffset, yOffset):
-        group = inkex.etree.SubElement(parent, 'g')
+        group = etree.SubElement(parent, 'g')
         self.group = group
         #Compute number of vertical lines. Each long mark should be at most 50mm long to avoid failures
         nMark = int(self.height / 50) + 1
@@ -537,7 +531,7 @@ class Path2Flex( inkex.Effect ):
             return None
 
         # parsePath() may raise an exception.  This is okay
-        simple_path = simplepath.parsePath( path )
+        simple_path = paths.Path(path).to_arrays()
         if ( not simple_path ) or ( len( simple_path ) == 0 ):
             # Path must have been devoid of any real content
             return None
@@ -545,7 +539,7 @@ class Path2Flex( inkex.Effect ):
         self.DebugMsg("  Path = "+str(simple_path)+'\n')
 
         # Get a cubic super path
-        cubic_super_path = cubicsuperpath.CubicSuperPath( simple_path )
+        cubic_super_path = paths.CubicSuperPath( simple_path )
         if ( not cubic_super_path ) or ( len( cubic_super_path ) == 0 ):
             # Probably never happens, but...
             return None
@@ -731,7 +725,7 @@ class Path2Flex( inkex.Effect ):
         return last_index_in_p
     
     def DrawPoly(self, p, parent):
-        group = inkex.etree.SubElement(parent, 'g')
+        group = etree.SubElement(parent, 'g')
         Newpath = inkcape_draw_cartesian((self.xmin - self.xmax - 10, 0), group)
         self.DebugMsg('DrawPoly First element (0) : '+str(p[0])+ ' Call MoveTo('+ str(p[0][0])+','+str(p[0][1])+'\n')
         Newpath.MoveTo(p[0][0], p[0][1])
@@ -937,7 +931,7 @@ class Path2Flex( inkex.Effect ):
                 notch_size =  BestNotchSize
    
             # Now draw the actual notches 
-            group = inkex.etree.SubElement(parent, 'g')
+            group = etree.SubElement(parent, 'g')
             # First draw a start line which will help to position flex.
             Startpath = inkcape_draw_cartesian(((self.xmin - self.xmax - 10), 0), group)
             index_in_p = notch_points[0][2]
@@ -1348,14 +1342,14 @@ class Path2Flex( inkex.Effect ):
 
         # convert units
         unit = self.options.unit
-        self.thickness = self.unittouu(str(self.options.thickness) + unit)
-        self.height = self.unittouu(str(self.options.zc) + unit)
-        self.max_flex_size = self.unittouu(str(self.options.max_size_flex) + unit)
+        self.thickness = self.svg.unittouu(str(self.options.thickness) + unit)
+        self.height = self.svg.unittouu(str(self.options.zc) + unit)
+        self.max_flex_size = self.svg.unittouu(str(self.options.max_size_flex) + unit)
         self.notchesInterval = int(self.options.notch_interval)
 
         svg = self.document.getroot()
-        docWidth = self.unittouu(svg.get('width'))
-        docHeigh = self.unittouu(svg.attrib['height'])
+        docWidth = self.svg.unittouu(svg.get('width'))
+        docHeigh = self.svg.unittouu(svg.attrib['height'])
 
         # Open Debug file if requested
         if self.options.Mode_Debug:
@@ -1373,12 +1367,12 @@ class Path2Flex( inkex.Effect ):
 
         # Traverse the selected objects
         for id in self.options.ids:
-            self.recursivelyTraverseSvg( [self.selected[id]] )
+            self.recursivelyTraverseSvg( [self.svg.selected[id]] )
         # Determine the center of the drawing's bounding box
         self.cx = self.xmin + ( self.xmax - self.xmin ) / 2.0
         self.cy = self.ymin + ( self.ymax - self.ymin ) / 2.0
 
-        layer = inkex.etree.SubElement(svg, 'g')
+        layer = etree.SubElement(svg, 'g')
         layer.set(inkex.addNS('label', 'inkscape'), 'Flex_Path')
         layer.set(inkex.addNS('groupmode', 'inkscape'), 'layer')
 
@@ -1392,4 +1386,4 @@ class Path2Flex( inkex.Effect ):
 if __name__ == '__main__':
 
     e = Path2Flex()
-    e.affect()
+    e.run()
