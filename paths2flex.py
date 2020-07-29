@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# coding: utf8
+#!/usr/bin/env python3
 
 
 # paths2flex.py
@@ -28,14 +27,10 @@
 import math
 import os.path
 import inkex
-import simplepath
-import simplestyle
-import simpletransform
-import cspsubdiv
 import re
 from lxml import etree
-from inkex import paths
 from inkex import bezier
+from inkex.paths import Path, CubicSuperPath
 
 DEFAULT_WIDTH = 100
 DEFAULT_HEIGHT = 100
@@ -114,7 +109,7 @@ class Segment(Line):
         self.xM = max(self.xA, self.xB)
         self.ym = min(self.yA, self.yB)
         self.yM = max(self.yA, self.yB)
-        Line.__init__( self, A[1] - B[1], B[0] - A[0], A[0] * B[1] - B[0] * A[1] )
+        Line.__init__(self, A[1] - B[1], B[0] - A[0], A[0] * B[1] - B[0] * A[1])
 
     def __str__(self):
         return "Segment "+str([A,B])+ " a="+str(self.a)+" b="+str(self.b)+" c="+str(self.c)
@@ -129,23 +124,21 @@ class Segment(Line):
     def __str__(self):
         return "Seg"+str([(self.xA, self.yA), (self.xB, self.yB)])+" Line a="+str(self.a)+" b="+str(self.b)+" c="+str(self.c)
 
-    
-
-def pointInBBox( pt, bbox ):
+def pointInBBox(pt, bbox):
 
     '''
     Determine if the point pt=[x, y] lies on or within the bounding
     box bbox=[xmin, xmax, ymin, ymax].
     '''
 
-    # if ( x < xmin ) or ( x > xmax ) or ( y < ymin ) or ( y > ymax )
-    if ( pt[0] < bbox[0] ) or ( pt[0] > bbox[1] ) or \
-        ( pt[1] < bbox[2] ) or ( pt[1] > bbox[3] ):
+    # if (x < xmin) or (x > xmax) or (y < ymin) or (y > ymax)
+    if (pt[0] < bbox[0]) or (pt[0] > bbox[1]) or \
+        (pt[1] < bbox[2]) or (pt[1] > bbox[3]):
         return False
     else:
         return True
 
-def bboxInBBox( bbox1, bbox2 ):
+def bboxInBBox(bbox1, bbox2):
 
     '''
     Determine if the bounding box bbox1 lies on or within the
@@ -157,15 +150,15 @@ def bboxInBBox( bbox1, bbox2 ):
     bbox2 = [ xmin2, xmax2, ymin2, ymax2 ]
     '''
 
-    # if ( xmin1 < xmin2 ) or ( xmax1 > xmax2 ) or ( ymin1 < ymin2 ) or ( ymax1 > ymax2 )
+    # if (xmin1 < xmin2) or (xmax1 > xmax2) or (ymin1 < ymin2) or (ymax1 > ymax2)
 
-    if ( bbox1[0] < bbox2[0] ) or ( bbox1[1] > bbox2[1] ) or \
-        ( bbox1[2] < bbox2[2] ) or ( bbox1[3] > bbox2[3] ):
+    if (bbox1[0] < bbox2[0]) or (bbox1[1] > bbox2[1]) or \
+        (bbox1[2] < bbox2[2]) or (bbox1[3] > bbox2[3]):
         return False
     else:
         return True
 
-def pointInPoly( p, poly, bbox=None ):
+def pointInPoly(p, poly, bbox=None):
 
     '''
     Use a ray casting algorithm to see if the point p = [x, y] lies within
@@ -173,12 +166,12 @@ def pointInPoly( p, poly, bbox=None ):
     is within poly, lies on an edge of poly, or is a vertex of poly.
     '''
 
-    if ( p is None ) or ( poly is None ):
+    if (p is None) or (poly is None):
         return False
 
     # Check to see if the point lies outside the polygon's bounding box
     if not bbox is None:
-        if not pointInBBox( p, bbox ):
+        if not pointInBBox(p, bbox):
             return False
 
     # Check to see if the point is a vertex
@@ -191,23 +184,23 @@ def pointInPoly( p, poly, bbox=None ):
     y = p[1]
     p1 = poly[0]
     p2 = poly[1]
-    for i in range( len( poly ) ):
+    for i in range(len(poly)):
         if i != 0:
             p1 = poly[i-1]
             p2 = poly[i]
-        if ( y == p1[1] ) and ( p1[1] == p2[1] ) and \
-            ( x > min( p1[0], p2[0] ) ) and ( x < max( p1[0], p2[0] ) ):
+        if (y == p1[1]) and (p1[1] == p2[1]) and \
+            (x > min(p1[0], p2[0])) and (x < max(p1[0], p2[0])):
             return True
 
-    n = len( poly )
+    n = len(poly)
     inside = False
 
     p1_x,p1_y = poly[0]
-    for i in range( n + 1 ):
+    for i in range(n + 1):
         p2_x,p2_y = poly[i % n]
-        if y > min( p1_y, p2_y ):
-            if y <= max( p1_y, p2_y ):
-                if x <= max( p1_x, p2_x ):
+        if y > min(p1_y, p2_y):
+            if y <= max(p1_y, p2_y):
+                if x <= max(p1_x, p2_x):
                     if p1_y != p2_y:
                         intersect = p1_x + (y - p1_y) * (p2_x - p1_x) / (p2_y - p1_y)
                         if x <= intersect:
@@ -218,7 +211,7 @@ def pointInPoly( p, poly, bbox=None ):
 
     return inside
 
-def polyInPoly( poly1, bbox1, poly2, bbox2 ):
+def polyInPoly(poly1, bbox1, poly2, bbox2):
 
     '''
     Determine if polygon poly2 = [[x1,y1],[x2,y2],...]
@@ -234,22 +227,22 @@ def polyInPoly( poly1, bbox1, poly2, bbox2 ):
     # See if poly1's bboundin box is NOT contained by poly2's bounding box
     # if it isn't, then poly1 cannot be contained by poly2.
 
-    if ( not bbox1 is None ) and ( not bbox2 is None ):
-        if not bboxInBBox( bbox1, bbox2 ):
+    if (not bbox1 is None) and (not bbox2 is None):
+        if not bboxInBBox(bbox1, bbox2):
             return False
 
     # To see if poly1 is contained by poly2, we need to ensure that each
     # vertex of poly1 lies on or within poly2
 
     for p in poly1:
-        if not pointInPoly( p, poly2, bbox2 ):
+        if not pointInPoly(p, poly2, bbox2):
             return False
 
     # Looks like poly1 is contained on or in Poly2
 
     return True
 
-def subdivideCubicPath( sp, flat, i=1 ):
+def subdivideCubicPath(sp, flat, i=1):
 
     '''
     [ Lifted from eggbot.py with impunity ]
@@ -265,7 +258,7 @@ def subdivideCubicPath( sp, flat, i=1 ):
 
     while True:
         while True:
-            if i >= len( sp ):
+            if i >= len(sp):
                 return
 
             p0 = sp[i - 1][1]
@@ -273,14 +266,14 @@ def subdivideCubicPath( sp, flat, i=1 ):
             p2 = sp[i][0]
             p3 = sp[i][1]
 
-            b = ( p0, p1, p2, p3 )
+            b = (p0, p1, p2, p3)
 
-            if bezier.maxdist( b ) > flat:
+            if bezier.maxdist(b) > flat:
                 break
 
             i += 1
 
-        one, two = bezier.beziersplitatt( b, 0.5 )
+        one, two = bezier.beziersplitatt(b, 0.5)
         sp[i - 1][2] = one[1]
         sp[i][0] = two[2]
         p = [one[2], one[3], two[1]]
@@ -290,7 +283,7 @@ def subdivideCubicPath( sp, flat, i=1 ):
 # Return a tuple with the two real solutions, raise an error if there is no real solution
 def Solve2nd(a, b, c):
     delta = b**2 - 4*a*c
-    if ( delta < 0 ):
+    if (delta < 0):
         print("No real solution")
         return none
     x1 = (-b + math.sqrt(delta))/(2*a)
@@ -300,40 +293,18 @@ def Solve2nd(a, b, c):
 #   Compute distance between two points
 def distance2points(x0, y0, x1, y1):
     return math.hypot(x0-x1,y0-y1)
-
-
-
     
-    
-class Path2Flex( inkex.Effect ):
+class Path2Flex(inkex.Effect):
 
-    def __init__( self ):
+    def __init__(self):
         inkex.Effect.__init__(self)
         self.knownUnits = ['in', 'pt', 'px', 'mm', 'cm', 'm', 'km', 'pc', 'yd', 'ft']
-
-        self.arg_parser.add_argument('--unit', action = 'store',
-          type = str, dest = 'unit', default = 'mm',
-          help = 'Unit, should be one of ')
-
-        self.arg_parser.add_argument('--thickness', action = 'store',
-          type = float, dest = 'thickness', default = '3.0',
-          help = 'Material thickness')
-
-        self.arg_parser.add_argument('--zc', action = 'store',
-          type = float, dest = 'zc', default = '50.0',
-          help = 'Flex height')
-
-        self.arg_parser.add_argument('--notch_interval', action = 'store',
-          type = int, dest = 'notch_interval', default = '2',
-          help = 'Interval between notches')
-
-        self.arg_parser.add_argument('--max_size_flex', action = 'store',
-          type = float, dest = 'max_size_flex', default = '1000.0',
-          help = 'Max size of a single band of flex, above this limit it will be cut')
-
-        self.arg_parser.add_argument('--Mode_Debug', action = 'store',
-          type = inkex.Boolean, dest = 'Mode_Debug', default = 'false',
-          help = 'Output Debug information in file')
+        self.arg_parser.add_argument('--unit', default = 'mm', help = 'Unit, should be one of ')
+        self.arg_parser.add_argument('--thickness', type = float, default = '3.0', help = 'Material thickness')
+        self.arg_parser.add_argument('--zc', type = float, default = '50.0', help = 'Flex height')
+        self.arg_parser.add_argument('--notch_interval', type = int, default = '2', help = 'Interval between notches')
+        self.arg_parser.add_argument('--max_size_flex', type = float, default = '1000.0', help = 'Max size of a single band of flex, above this limit it will be cut')
+        self.arg_parser.add_argument('--Mode_Debug', type = inkex.Boolean, default = 'false', help = 'Output Debug information in file')
 
         # Dictionary of paths we will construct.  It's keyed by the SVG node
         # it came from.  Such keying isn't too useful in this specific case,
@@ -350,10 +321,10 @@ class Path2Flex( inkex.Effect ):
         self.warnings = {}
         
         #Get bounding rectangle
-        self.xmin, self.xmax = ( 1.0E70, -1.0E70 )
-        self.ymin, self.ymax = ( 1.0E70, -1.0E70 )
-        self.cx = float( DEFAULT_WIDTH ) / 2.0
-        self.cy = float( DEFAULT_HEIGHT ) / 2.0
+        self.xmin, self.xmax = (1.0E70, -1.0E70)
+        self.ymin, self.ymax = (1.0E70, -1.0E70)
+        self.cx = float(DEFAULT_WIDTH) / 2.0
+        self.cy = float(DEFAULT_HEIGHT) / 2.0
 
         def unittouu(self, unit):
             return inkex.unittouu(unit)
@@ -394,7 +365,7 @@ class Path2Flex( inkex.Effect ):
         # Then notch
         path.Line(step*size_notch, self.height - ShortMark, step*size_notch, self.height + self.thickness)
         path.LineTo((step+notch_useful)*size_notch, self.height + self.thickness)
-        path.LineTo((step+notch_useful)*size_notch, self.height - ShortMark )
+        path.LineTo((step+notch_useful)*size_notch, self.height - ShortMark)
         if ShortMark != 0:
             #Then nMark-1 Lines
             self.GenLinesFlex((step+notch_useful)*size_notch, self.height - ShortMark - 2, (self.height - 2*ShortMark - 2.0)/(nMark-1) - 2.0, nMark-1, -1, path)
@@ -441,7 +412,7 @@ class Path2Flex( inkex.Effect ):
         path.LineTo((notch_useful-1)*size_notch, self.height+self.thickness)
         # Then notch
         path.LineTo(-notch_in*size_notch, self.height + self.thickness)
-        path.LineTo(-notch_in*size_notch, self.height - ShortMark + 1 )
+        path.LineTo(-notch_in*size_notch, self.height - ShortMark + 1)
         if ShortMark != 0:
             #Then nMark - 1 Lines
             self.GenLinesFlex(-notch_in*size_notch, self.height - ShortMark - 2, (self.height - 2*ShortMark - 2.0)/(nMark-1) - 2.0, nMark-1, -1, path)
@@ -517,7 +488,7 @@ class Path2Flex( inkex.Effect ):
                 self.GenerateEndFlex(notch, size_notch, ShortMark, LongMark, nMark, idx_notch)
             xOffset -= size_notch * notch_per_band + 10
             
-    def getPathVertices( self, path, node=None ):
+    def getPathVertices(self, path, node=None):
 
         '''
         Decompose the path data from an SVG element into individual
@@ -526,21 +497,21 @@ class Path2Flex( inkex.Effect ):
         vertices.
         '''
         self.DebugMsg("Entering getPathVertices, len="+str(len(path))+"\n")
-        if ( not path ) or ( len( path ) == 0 ):
+        if (not path) or (len(path) == 0):
             # Nothing to do
             return None
 
         # parsePath() may raise an exception.  This is okay
-        simple_path = paths.Path(path).to_arrays()
-        if ( not simple_path ) or ( len( simple_path ) == 0 ):
+        simple_path = Path(path).to_arrays()
+        if (not simple_path) or (len(simple_path) == 0):
             # Path must have been devoid of any real content
             return None
         self.DebugMsg("After parsePath in getPathVertices, len="+str(len(simple_path))+"\n")
         self.DebugMsg("  Path = "+str(simple_path)+'\n')
 
         # Get a cubic super path
-        cubic_super_path = paths.CubicSuperPath( simple_path )
-        if ( not cubic_super_path ) or ( len( cubic_super_path ) == 0 ):
+        cubic_super_path = CubicSuperPath(simple_path)
+        if (not cubic_super_path) or (len(cubic_super_path) == 0):
             # Probably never happens, but...
             return None
         self.DebugMsg("After CubicSuperPath in getPathVertices, len="+str(len(cubic_super_path))+"\n")
@@ -554,36 +525,35 @@ class Path2Flex( inkex.Effect ):
 
             # We've started a new subpath
             # See if there is a prior subpath and whether we should keep it
-            self.DebugMsg("Processing SubPath"+str(index_sp)+" SubPath List len="+str(len( subpath_list))+"  Vertices list length="+str(len( subpath_vertices)) +"\n")
+            self.DebugMsg("Processing SubPath"+str(index_sp)+" SubPath List len="+str(len(subpath_list))+"  Vertices list length="+str(len(subpath_vertices)) +"\n")
 
-            if len( subpath_vertices ):
-                subpath_list.append( subpath_vertices )
+            if len(subpath_vertices):
+                subpath_list.append(subpath_vertices)
 
             subpath_vertices = []
-            self.DebugMsg("Before subdivideCubicPath len="+str(len( sp)) +"\n")
+            self.DebugMsg("Before subdivideCubicPath len="+str(len(sp)) +"\n")
             self.DebugMsg("   Bsp="+str(sp)+'\n')
-            subdivideCubicPath( sp, 0.1 )
-            self.DebugMsg("After subdivideCubicPath len="+str(len( sp)) +"\n")
+            subdivideCubicPath(sp, 0.1)
+            self.DebugMsg("After subdivideCubicPath len="+str(len(sp)) +"\n")
             self.DebugMsg("   Asp="+str(sp)+'\n')
-
 
             # Note the first point of the subpath
             first_point = sp[0][1]
-            subpath_vertices.append( first_point )
+            subpath_vertices.append(first_point)
             sp_xmin = first_point[0]
             sp_xmax = first_point[0]
             sp_ymin = first_point[1]
             sp_ymax = first_point[1]
 
-            n = len( sp )
+            n = len(sp)
 
             # Traverse each point of the subpath
             for csp in sp[1:n]:
 
                 # Append the vertex to our list of vertices
                 pt = csp[1]
-                subpath_vertices.append( pt )
-                #self.DebugMsg("Append subpath_vertice '"+str(pt)+"len="+str(len( subpath_vertices)) +"\n")
+                subpath_vertices.append(pt)
+                #self.DebugMsg("Append subpath_vertice '"+str(pt)+"len="+str(len(subpath_vertices)) +"\n")
 
 
                 # Track the bounding box of this subpath
@@ -608,10 +578,10 @@ class Path2Flex( inkex.Effect ):
                 self.ymax = sp_ymax
 
         # Handle the final subpath
-        if len( subpath_vertices ):
-            subpath_list.append( subpath_vertices )
+        if len(subpath_vertices):
+            subpath_list.append(subpath_vertices)
 
-        if len( subpath_list ) > 0:
+        if len(subpath_list) > 0:
             self.paths[node] = subpath_list
 
         '''
@@ -729,7 +699,7 @@ class Path2Flex( inkex.Effect ):
         Newpath = inkcape_draw_cartesian((self.xmin - self.xmax - 10, 0), group)
         self.DebugMsg('DrawPoly First element (0) : '+str(p[0])+ ' Call MoveTo('+ str(p[0][0])+','+str(p[0][1])+'\n')
         Newpath.MoveTo(p[0][0], p[0][1])
-        n = len( p )
+        n = len(p)
         index = 1
         for point in p[1:n]:
             Newpath.LineTo(point[0], point[1])
@@ -791,14 +761,14 @@ class Path2Flex( inkex.Effect ):
         angles.append(angles[0])
         return angles
     
-    def writeModifiedPath( self, node, parent ):
+    def writeModifiedPath(self, node, parent):
         ''' 
         Take the paths (polygons) computed from previous step and generate 
         1) The input path with notches
         2) The flex structure associated with the path with notches (same length and number of notches)
         '''
         path = self.paths[node]
-        if ( path is None ) or ( len( path ) == 0 ):
+        if (path is None) or (len(path) == 0):
             return
         self.DebugMsg('Enter writeModifiedPath, node='+str(node)+' '+str(len(path))+' paths, global Offset'+str((self.xmin - self.xmax - 10, 0))+'\n')
         
@@ -836,7 +806,7 @@ class Path2Flex( inkex.Effect ):
             self.DrawPoly(p, parent)
             #Now compute path length. Path length is the sum of length of edges
             length_path = 0
-            n = len( p )
+            n = len(p)
             index = 1
             while index < n:
                 length_path += math.hypot((p[index][0] - p[index-1][0]), (p[index][1] - p[index-1][1]))
@@ -935,7 +905,7 @@ class Path2Flex( inkex.Effect ):
             # First draw a start line which will help to position flex.
             Startpath = inkcape_draw_cartesian(((self.xmin - self.xmax - 10), 0), group)
             index_in_p = notch_points[0][2]
-            AngleSlope = math.atan2( p[index_in_p+1][1] - p[index_in_p][1], p[index_in_p+1][0] - p[index_in_p][0])
+            AngleSlope = math.atan2(p[index_in_p+1][1] - p[index_in_p][1], p[index_in_p+1][0] - p[index_in_p][0])
             #Now compute both ends of the notch, 
             AngleOrtho = AngleSlope + math.pi/2
             Line_Start = (notch_points[0][0] + self.thickness/2*math.cos(AngleOrtho), notch_points[0][1] + self.thickness/2*math.sin(AngleOrtho))
@@ -952,15 +922,15 @@ class Path2Flex( inkex.Effect ):
                     AngleOrtho += math.pi
             #Now compute a new Start, inside the polygon Start = 3*End - 2*Start
             newLine_Start = (3*Line_End[0] - 2*Line_Start[0], 3*Line_End[1] - 2*Line_Start[1])
-            Startpath.MoveTo(newLine_Start[0], newLine_Start[1] )
-            Startpath.LineTo(Line_End[0], Line_End[1] )
-            self.DebugMsg("Draw StartLine start from "+str((newLine_Start[0], newLine_Start[1] ))+" to "+str((Line_End[0], Line_End[1] ))+'\n')
+            Startpath.MoveTo(newLine_Start[0], newLine_Start[1])
+            Startpath.LineTo(Line_End[0], Line_End[1])
+            self.DebugMsg("Draw StartLine start from "+str((newLine_Start[0], newLine_Start[1]))+" to "+str((Line_End[0], Line_End[1]))+'\n')
             Startpath.GenPathStart()
             
             #Then draw the notches
             Newpath = inkcape_draw_cartesian(((self.xmin - self.xmax - 10), 0), group)
             self.DebugMsg("Generate path with "+str(notch_number)+" notches, offset ="+str(((self.xmin - self.xmax - 10), 0))+'\n')
-            isClosed = distance2points(p[n-1][0], p[n-1][1], p[0][0], p[0][1] ) < 0.1
+            isClosed = distance2points(p[n-1][0], p[n-1][1], p[0][0], p[0][1]) < 0.1
             # Each notch is a tuple with (X, Y, index_in_p). index_in_p will be used to compute slope of line of the notch
             # The notch will be thickness long, and there will be a part 'inside' the path and a part 'outside' the path
             # The longest part will be outside
@@ -979,7 +949,7 @@ class Path2Flex( inkex.Effect ):
                 # Line slope of the path at notch point is
                 index_in_p = notch_points[index][2]
                 N_Angle = angles[index_in_p]
-                AngleSlope = math.atan2( p[index_in_p+1][1] - p[index_in_p][1], p[index_in_p+1][0] - p[index_in_p][0])
+                AngleSlope = math.atan2(p[index_in_p+1][1] - p[index_in_p][1], p[index_in_p+1][0] - p[index_in_p][0])
                 self.DebugMsg("Draw notch "+str(index)+" Slope is "+str(AngleSlope*180/math.pi)+'\n')
                 self.DebugMsg("Ref="+str(notch_points[index])+'\n')
                 self.DebugMsg("Path points:"+str((p[index_in_p][0], p[index_in_p][1]))+', '+ str((p[index_in_p+1][0], p[index_in_p+1][1]))+'\n')
@@ -1005,32 +975,32 @@ class Path2Flex( inkex.Effect ):
                     AngleOrtho -= 2*math.pi
                 ln = 2.0
                 if index == 0:
-                    Newpath.MoveTo(Notch_Start[0], Notch_Start[1] )
-                    first = (Notch_Start[0], Notch_Start[1] )
+                    Newpath.MoveTo(Notch_Start[0], Notch_Start[1])
+                    first = (Notch_Start[0], Notch_Start[1])
                     if not isClosed:       
                         ln = 1.0        # Actual, different Notch size for the first one when open path
                 else:
-                    Newpath.LineTo(Notch_Start[0], Notch_Start[1] )
+                    Newpath.LineTo(Notch_Start[0], Notch_Start[1])
                     if not isClosed and index == notch_number - 1: 
                         ln = 1.0
                     self.DebugMsg("LineTo starting point from :"+str((x,y))+" to "+str((Notch_Start[0], Notch_Start[1]))+" Length ="+str(distance2points(x, y, Notch_Start[0], Notch_Start[1]))+'\n')
-                Newpath.LineTo(Notch_End[0], Notch_End[1] )
+                Newpath.LineTo(Notch_End[0], Notch_End[1])
                 NX0 = Notch_Start[0]
                 NY0 = Notch_Start[1]
                 NX1 = Notch_End[0]
                 NY1 = Notch_End[1]
-                self.DebugMsg("Draw notch_1 start from "+str((Notch_Start[0], Notch_Start[1] ))+" to "+str((Notch_End[0], Notch_End[1] ))+'Center is '+str(((Notch_Start[0]+Notch_End[0])/2, (Notch_Start[1]+Notch_End[1])/2))+'\n')
+                self.DebugMsg("Draw notch_1 start from "+str((Notch_Start[0], Notch_Start[1]))+" to "+str((Notch_End[0], Notch_End[1]))+'Center is '+str(((Notch_Start[0]+Notch_End[0])/2, (Notch_Start[1]+Notch_End[1])/2))+'\n')
                 #Now draw a line parallel to the path, which is notch_size*(2/(notchesInterval+2)) long. Internal part of the notch
                 x = Notch_End[0] + (notch_size*ln)/(self.notchesInterval+ln)*math.cos(AngleSlope)
                 y = Notch_End[1] + (notch_size*ln)/(self.notchesInterval+ln)*math.sin(AngleSlope)
-                Newpath.LineTo(x, y )
+                Newpath.LineTo(x, y)
                 NX2 = x
                 NY2 = y
                 self.DebugMsg("Draw notch_2 to "+str((x, y))+'\n')
                 #Then a line orthogonal, which is thickness long, reverse from first one
                 x = x + self.thickness*math.cos(AngleOrtho)
                 y = y + self.thickness*math.sin(AngleOrtho)
-                Newpath.LineTo(x, y )
+                Newpath.LineTo(x, y)
                 NX3 = x
                 NY3 = y
                 self.DebugMsg("Draw notch_3 to "+str((x, y))+'\n')
@@ -1039,15 +1009,15 @@ class Path2Flex( inkex.Effect ):
                 index += 1
             #And the last one if the path is closed
             if isClosed:
-                self.DebugMsg("Path is closed, draw line to start point "+str((p[0][0], p[0][1] ) )+'\n')
-                Newpath.LineTo(first[0], first[1] )
+                self.DebugMsg("Path is closed, draw line to start point "+str((p[0][0], p[0][1]))+'\n')
+                Newpath.LineTo(first[0], first[1])
             else:
                 self.DebugMsg("Path is open\n") 
             Newpath.GenPath()
             # Analyze notches for debugging purpose
             for i in range(len(Notch_Pos)):
                 self.DebugMsg("Notch "+str(i)+" Pos="+str(Notch_Pos[i])+" Angle="+str(round(Notch_Pos[i][8]*180/math.pi))+"\n")
-                if ( i > 0 ):
+                if (i > 0):
                     self.DebugMsg("  FromLast Notch N3-N0="+str(distance2points(Notch_Pos[i-1][6], Notch_Pos[i-1][7], Notch_Pos[i][0], Notch_Pos[i][1]))+"\n")
                 self.DebugMsg("  Distances: N0-N3="+str(distance2points(Notch_Pos[i][0], Notch_Pos[i][1], Notch_Pos[i][6], Notch_Pos[i][7]))+" N1-N2="+str(distance2points(Notch_Pos[i][2], Notch_Pos[i][3], Notch_Pos[i][4], Notch_Pos[i][5]))+"\n")
             # For each notch determine if we need flex or not. Flex is only needed if there is some curves 
@@ -1081,7 +1051,7 @@ class Path2Flex( inkex.Effect ):
             index_path += 1
         
 
-    def recursivelyTraverseSvg( self, aNodeList):
+    def recursivelyTraverseSvg(self, aNodeList):
 
         '''
         [ This too is largely lifted from eggbot.py and path2openscad.py ]
@@ -1106,39 +1076,38 @@ class Path2Flex( inkex.Effect ):
         for node in aNodeList:
 
             self.DebugMsg("Node type :" + node.tag + '\n')
-            if node.tag == inkex.addNS( 'g', 'svg' ) or node.tag == 'g':
+            if node.tag == inkex.addNS('g', 'svg') or node.tag == 'g':
                 self.DebugMsg("Group detected, recursive call\n")
-                self.recursivelyTraverseSvg( node )
+                self.recursivelyTraverseSvg(node)
 
-            elif node.tag == inkex.addNS( 'path', 'svg' ):
+            elif node.tag == inkex.addNS('path', 'svg'):
                 self.DebugMsg("Path detected, ")
-                path_data = node.get( 'd')
+                path_data = node.get('d')
                 if path_data:
-                    self.getPathVertices( path_data, node )
+                    self.getPathVertices(path_data, node)
                 else:
                     self.DebugMsg("NO path data present\n")
 
-            elif node.tag == inkex.addNS( 'rect', 'svg' ) or node.tag == 'rect':
+            elif node.tag == inkex.addNS('rect', 'svg') or node.tag == 'rect':
 
                 # Create a path with the outline of the rectangle
-                x = float( node.get( 'x' ) )
-                y = float( node.get( 'y' ) )
-                if ( not x ) or ( not y ):
+                x = float(node.get('x'))
+                y = float(node.get('y'))
+                if (not x) or (not y):
                     pass
-                w = float( node.get( 'width', '0' ) )
-                h = float( node.get( 'height', '0' ) )
+                w = float(node.get('width', '0'))
+                h = float(node.get('height', '0'))
 
-                self.DebugMsg('Rectangle X='+ str(x)+',Y='+str(y)+', W='+str(w)+' H='+str(h)+'\n' )
+                self.DebugMsg('Rectangle X='+ str(x)+',Y='+str(y)+', W='+str(w)+' H='+str(h)+'\n')
 
                 a = []
-                a.append( ['M ', [x, y]] )
-                a.append( [' l ', [w, 0]] )
-                a.append( [' l ', [0, h]] )
-                a.append( [' l ', [-w, 0]] )
-                a.append( [' Z', []] )
-                self.getPathVertices( simplepath.formatPath( a ), node )
-
-            elif node.tag == inkex.addNS( 'line', 'svg' ) or node.tag == 'line':
+                a.append(['M', [x, y]])
+                a.append(['l', [w, 0]])
+                a.append(['l', [0, h]])
+                a.append(['l', [-w, 0]])
+                a.append(['Z', []])
+                self.getPathVertices(str(Path(a)), node)
+            elif node.tag == inkex.addNS('line', 'svg') or node.tag == 'line':
 
                 # Convert
                 #
@@ -1148,21 +1117,20 @@ class Path2Flex( inkex.Effect ):
                 #
                 #   <path d="MX1,Y1 LX2,Y2"/>
 
-                x1 = float( node.get( 'x1' ) )
-                y1 = float( node.get( 'y1' ) )
-                x2 = float( node.get( 'x2' ) )
-                y2 = float( node.get( 'y2' ) )
-                self.DebugMsg('Line X1='+ str(x1)+',Y1='+str(y1)+', X2='+str(x2)+' Y2='+str(y2)+'\n' )
+                x1 = float(node.get('x1'))
+                y1 = float(node.get('y1'))
+                x2 = float(node.get('x2'))
+                y2 = float(node.get('y2'))
+                self.DebugMsg('Line X1='+ str(x1)+',Y1='+str(y1)+', X2='+str(x2)+' Y2='+str(y2)+'\n')
 
-                if ( not x1 ) or ( not y1 ) or ( not x2 ) or ( not y2 ):
+                if (not x1) or (not y1) or (not x2) or (not y2):
                     pass
                 a = []
-                a.append( ['M ', [x1, y1]] )
-                a.append( [' L ', [x2, y2]] )
-                self.getPathVertices( simplepath.formatPath( a ), node )
+                a.append(['M', [x1, y1]])
+                a.append(['L', [x2, y2]])
+                self.getPathVertices(str(Path(a)), node)
 
-
-            elif node.tag == inkex.addNS( 'polyline', 'svg' ) or node.tag == 'polyline':
+            elif node.tag == inkex.addNS('polyline', 'svg') or node.tag == 'polyline':
 
                 # Convert
                 #
@@ -1174,18 +1142,18 @@ class Path2Flex( inkex.Effect ):
                 #
                 # Note: we ignore polylines with no points
 
-                pl = node.get( 'points', '' ).strip()
+                pl = node.get('points', '').strip()
                 if pl == '':
                     pass
 
                 pa = pl.split()
-                d = "".join( ["M " + pa[i] if i == 0 else " L " + pa[i] for i in range( 0, len( pa ) )] )
-                self.DebugMsg('PolyLine :'+ d +'\n' )
+                d = "".join(["M " + pa[i] if i == 0 else " L " + pa[i] for i in range(0, len(pa))])
+                self.DebugMsg('PolyLine :'+ d +'\n')
 
                 
-                self.getPathVertices( d, node )
+                self.getPathVertices(d, node)
 
-            elif node.tag == inkex.addNS( 'polygon', 'svg' ) or node.tag == 'polygon':
+            elif node.tag == inkex.addNS('polygon', 'svg') or node.tag == 'polygon':
 
                 # Convert
                 #
@@ -1197,19 +1165,19 @@ class Path2Flex( inkex.Effect ):
                 #
                 # Note: we ignore polygons with no points
 
-                pl = node.get( 'points', '' ).strip()
+                pl = node.get('points', '').strip()
                 if pl == '':
                     pass
 
                 pa = pl.split()
-                d = "".join( ["M " + pa[i] if i == 0 else " L " + pa[i] for i in range( 0, len( pa ) )] )
+                d = "".join(["M " + pa[i] if i == 0 else " L " + pa[i] for i in range(0, len(pa))])
                 d += " Z"
-                self.DebugMsg('Polygon :'+ d +'\n' )
-                self.getPathVertices( d, node )
+                self.DebugMsg('Polygon :'+ d +'\n')
+                self.getPathVertices(d, node)
 
-            elif node.tag == inkex.addNS( 'ellipse', 'svg' ) or \
+            elif node.tag == inkex.addNS('ellipse', 'svg') or \
                 node.tag == 'ellipse' or \
-                node.tag == inkex.addNS( 'circle', 'svg' ) or \
+                node.tag == inkex.addNS('circle', 'svg') or \
                 node.tag == 'circle':
 
                     # Convert circles and ellipses to a path with two 180 degree arcs.
@@ -1228,101 +1196,101 @@ class Path2Flex( inkex.Effect ):
                     #
                     # Note: ellipses or circles with a radius attribute of value 0 are ignored
 
-                    if node.tag == inkex.addNS( 'ellipse', 'svg' ) or node.tag == 'ellipse':
-                        rx = float( node.get( 'rx', '0' ) )
-                        ry = float( node.get( 'ry', '0' ) )
+                    if node.tag == inkex.addNS('ellipse', 'svg') or node.tag == 'ellipse':
+                        rx = float(node.get('rx', '0'))
+                        ry = float(node.get('ry', '0'))
                     else:
-                        rx = float( node.get( 'r', '0' ) )
+                        rx = float(node.get('r', '0'))
                         ry = rx
                     if rx == 0 or ry == 0:
                         pass
 
-                    cx = float( node.get( 'cx', '0' ) )
-                    cy = float( node.get( 'cy', '0' ) )
+                    cx = float(node.get('cx', '0'))
+                    cy = float(node.get('cy', '0'))
                     x1 = cx - rx
                     x2 = cx + rx
-                    d = 'M %f,%f ' % ( x1, cy ) + \
-                        'A %f,%f ' % ( rx, ry ) + \
-                        '0 1 0 %f,%f ' % ( x2, cy ) + \
-                        'A %f,%f ' % ( rx, ry ) + \
-                        '0 1 0 %f,%f' % ( x1, cy )
-                    self.DebugMsg('Arc :'+ d +'\n' )
-                    self.getPathVertices( d, node )
+                    d = 'M %f,%f ' % (x1, cy) + \
+                        'A %f,%f ' % (rx, ry) + \
+                        '0 1 0 %f,%f ' % (x2, cy) + \
+                        'A %f,%f ' % (rx, ry) + \
+                        '0 1 0 %f,%f' % (x1, cy)
+                    self.DebugMsg('Arc :'+ d +'\n')
+                    self.getPathVertices(d, node)
 
-            elif node.tag == inkex.addNS( 'pattern', 'svg' ) or node.tag == 'pattern':
-
-                pass
-
-            elif node.tag == inkex.addNS( 'metadata', 'svg' ) or node.tag == 'metadata':
+            elif node.tag == inkex.addNS('pattern', 'svg') or node.tag == 'pattern':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'defs', 'svg' ) or node.tag == 'defs':
+            elif node.tag == inkex.addNS('metadata', 'svg') or node.tag == 'metadata':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'desc', 'svg' ) or node.tag == 'desc':
+            elif node.tag == inkex.addNS('defs', 'svg') or node.tag == 'defs':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'namedview', 'sodipodi' ) or node.tag == 'namedview':
+            elif node.tag == inkex.addNS('desc', 'svg') or node.tag == 'desc':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'eggbot', 'svg' ) or node.tag == 'eggbot':
+            elif node.tag == inkex.addNS('namedview', 'sodipodi') or node.tag == 'namedview':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'text', 'svg' ) or node.tag == 'text':
-
-                inkex.errormsg( 'Warning: unable to draw text, please convert it to a path first.' )
+            elif node.tag == inkex.addNS('eggbot', 'svg') or node.tag == 'eggbot':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'title', 'svg' ) or node.tag == 'title':
+            elif node.tag == inkex.addNS('text', 'svg') or node.tag == 'text':
+
+                inkex.errormsg('Warning: unable to draw text, please convert it to a path first.')
 
                 pass
 
-            elif node.tag == inkex.addNS( 'image', 'svg' ) or node.tag == 'image':
+            elif node.tag == inkex.addNS('title', 'svg') or node.tag == 'title':
 
-                if not self.warnings.has_key( 'image' ):
-                    inkex.errormsg( gettext.gettext( 'Warning: unable to draw bitmap images; ' +
+                pass
+
+            elif node.tag == inkex.addNS('image', 'svg') or node.tag == 'image':
+
+                if not self.warnings.has_key('image'):
+                    inkex.errormsg(gettext.gettext('Warning: unable to draw bitmap images; ' +
                         'please convert them to line art first.  Consider using the "Trace bitmap..." ' +
                         'tool of the "Path" menu.  Mac users please note that some X11 settings may ' +
-                        'cause cut-and-paste operations to paste in bitmap copies.' ) )
+                        'cause cut-and-paste operations to paste in bitmap copies.'))
                     self.warnings['image'] = 1
                 pass
 
-            elif node.tag == inkex.addNS( 'pattern', 'svg' ) or node.tag == 'pattern':
+            elif node.tag == inkex.addNS('pattern', 'svg') or node.tag == 'pattern':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'radialGradient', 'svg' ) or node.tag == 'radialGradient':
+            elif node.tag == inkex.addNS('radialGradient', 'svg') or node.tag == 'radialGradient':
 
                 # Similar to pattern
                 pass
 
-            elif node.tag == inkex.addNS( 'linearGradient', 'svg' ) or node.tag == 'linearGradient':
+            elif node.tag == inkex.addNS('linearGradient', 'svg') or node.tag == 'linearGradient':
 
                 # Similar in pattern
                 pass
 
-            elif node.tag == inkex.addNS( 'style', 'svg' ) or node.tag == 'style':
+            elif node.tag == inkex.addNS('style', 'svg') or node.tag == 'style':
 
                 # This is a reference to an external style sheet and not the value
                 # of a style attribute to be inherited by child elements
                 pass
 
-            elif node.tag == inkex.addNS( 'cursor', 'svg' ) or node.tag == 'cursor':
+            elif node.tag == inkex.addNS('cursor', 'svg') or node.tag == 'cursor':
 
                 pass
 
-            elif node.tag == inkex.addNS( 'color-profile', 'svg' ) or node.tag == 'color-profile':
+            elif node.tag == inkex.addNS('color-profile', 'svg') or node.tag == 'color-profile':
 
                 # Gamma curves, color temp, etc. are not relevant to single color output
                 pass
 
-            elif not isinstance( node.tag, basestring ):
+            elif not isinstance(node.tag, basestring):
 
                 # This is likely an XML processing instruction such as an XML
                 # comment.  lxml uses a function reference for such node tags
@@ -1334,11 +1302,11 @@ class Path2Flex( inkex.Effect ):
 
             else:
 
-                inkex.errormsg( 'Warning: unable to draw object <%s>, please convert it to a path first.' % node.tag )
+                inkex.errormsg('Warning: unable to draw object <%s>, please convert it to a path first.' % node.tag)
                 pass
 
 
-    def effect( self ):
+    def effect(self):
 
         # convert units
         unit = self.options.unit
@@ -1354,7 +1322,7 @@ class Path2Flex( inkex.Effect ):
         # Open Debug file if requested
         if self.options.Mode_Debug:
             try:
-                self.fDebug = open( 'DebugPath2Flex.txt', 'w')
+                self.fDebug = open('DebugPath2Flex.txt', 'w')
             except IOError:
                 print ('cannot open debug output file')
             self.DebugMsg("Start processing\n")
@@ -1367,10 +1335,10 @@ class Path2Flex( inkex.Effect ):
 
         # Traverse the selected objects
         for id in self.options.ids:
-            self.recursivelyTraverseSvg( [self.svg.selected[id]] )
+            self.recursivelyTraverseSvg([self.svg.selected[id]])
         # Determine the center of the drawing's bounding box
-        self.cx = self.xmin + ( self.xmax - self.xmin ) / 2.0
-        self.cy = self.ymin + ( self.ymax - self.ymin ) / 2.0
+        self.cx = self.xmin + (self.xmax - self.xmin) / 2.0
+        self.cy = self.ymin + (self.ymax - self.ymin) / 2.0
 
         layer = etree.SubElement(svg, 'g')
         layer.set(inkex.addNS('label', 'inkscape'), 'Flex_Path')
@@ -1378,12 +1346,10 @@ class Path2Flex( inkex.Effect ):
 
         # For each path, build a polygon with notches and the corresponding flex.
         for key in self.paths:
-            self.writeModifiedPath( key, layer )
+            self.writeModifiedPath(key, layer)
 
         if self.fDebug:
             self.fDebug.close()
 
 if __name__ == '__main__':
-
-    e = Path2Flex()
-    e.run()
+    Path2Flex().run()
